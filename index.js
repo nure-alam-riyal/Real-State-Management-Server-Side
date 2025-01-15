@@ -108,7 +108,49 @@ async function run() {
       ]).toArray()
       res.send(result)
     })
+    app.get('/allreview', async(req, res) => {
+          const result=await reviewCollection.find().toArray()
+          res.send(result)
+    })
+    app.get('/latestreview', async(req, res) => {
+      const count=await reviewCollection.estimatedDocumentCount()
 
+      const result = await reviewCollection.aggregate([
+        {
+           $match:{}
+        },
+        {
+          $addFields:{
+            propertId:{$toObjectId:"$propertyId"}
+          }
+      },
+      {
+         $lookup: {
+          from: "property",
+           localField:'propertId',
+           foreignField:'_id' ,
+          as:"reviewProperty"
+                    }
+      },{
+        $unwind:"$reviewProperty"
+      },{
+        $addFields:{
+          // propertyName:'$reviewProperty.propertyName',
+          // image:'$reviewProperty.image',
+        agentName:'$reviewProperty.agentName',
+          agentImage:'$reviewProperty.agentImage'
+        }
+      },
+        {
+          $project:{
+            reviewProperty:0
+          }
+        }
+      
+  
+      ]).skip(count-3).limit(count).toArray()
+      res.send(result)
+    })
 
     app.post('/user', async (req, res) => {
       const user = req.body
