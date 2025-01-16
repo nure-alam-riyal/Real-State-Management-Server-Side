@@ -77,78 +77,78 @@ async function run() {
           $match: { reviewerEmail: email }
         },
         {
-            $addFields:{
-              propertId:{$toObjectId:"$propertyId"}
-            }
+          $addFields: {
+            propertId: { $toObjectId: "$propertyId" }
+          }
         },
         {
-           $lookup: {
+          $lookup: {
             from: "property",
-             localField:'propertId',
-             foreignField:'_id' ,
-            as:"reviewProperty"
-                      }
-        },{
-          $unwind:"$reviewProperty"
-        },{
-          $addFields:{
-            propertyName:'$reviewProperty.propertyName',
-            image:'$reviewProperty.image',
-          agentName:'$reviewProperty.agentName',
-            agentImage:'$reviewProperty.agentImage'
+            localField: 'propertId',
+            foreignField: '_id',
+            as: "reviewProperty"
+          }
+        }, {
+          $unwind: "$reviewProperty"
+        }, {
+          $addFields: {
+            propertyName: '$reviewProperty.propertyName',
+            image: '$reviewProperty.image',
+            agentName: '$reviewProperty.agentName',
+            agentImage: '$reviewProperty.agentImage'
           }
         },
-          {
-            $project:{
-              reviewProperty:0
-            }
+        {
+          $project: {
+            reviewProperty: 0
           }
-        
-    
+        }
+
+
       ]).toArray()
       res.send(result)
     })
-    app.get('/allreview', async(req, res) => {
-          const result=await reviewCollection.find().toArray()
-          res.send(result)
+    app.get('/allreview', async (req, res) => {
+      const result = await reviewCollection.find().toArray()
+      res.send(result)
     })
-    app.get('/latestreview', async(req, res) => {
-      const count=await reviewCollection.estimatedDocumentCount()
+    app.get('/latestreview', async (req, res) => {
+      const count = await reviewCollection.estimatedDocumentCount()
 
       const result = await reviewCollection.aggregate([
         {
-           $match:{}
+          $match: {}
         },
         {
-          $addFields:{
-            propertId:{$toObjectId:"$propertyId"}
+          $addFields: {
+            propertId: { $toObjectId: "$propertyId" }
           }
-      },
-      {
-         $lookup: {
-          from: "property",
-           localField:'propertId',
-           foreignField:'_id' ,
-          as:"reviewProperty"
-                    }
-      },{
-        $unwind:"$reviewProperty"
-      },{
-        $addFields:{
-          // propertyName:'$reviewProperty.propertyName',
-          // image:'$reviewProperty.image',
-        agentName:'$reviewProperty.agentName',
-          agentImage:'$reviewProperty.agentImage'
-        }
-      },
+        },
         {
-          $project:{
-            reviewProperty:0
+          $lookup: {
+            from: "property",
+            localField: 'propertId',
+            foreignField: '_id',
+            as: "reviewProperty"
+          }
+        }, {
+          $unwind: "$reviewProperty"
+        }, {
+          $addFields: {
+            propertyName:'$reviewProperty.propertyName',
+            // image:'$reviewProperty.image',
+            // agentName: '$reviewProperty.agentName',
+            // agentImage: '$reviewProperty.agentImage'
+          }
+        },
+        {
+          $project: {
+            reviewProperty: 0
           }
         }
-      
-  
-      ]).skip(count-3).limit(count).toArray()
+
+
+      ]).skip(count - 3).limit(count).toArray()
       res.send(result)
     })
 
