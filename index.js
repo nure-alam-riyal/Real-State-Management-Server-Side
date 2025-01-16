@@ -29,6 +29,7 @@ async function run() {
     const userCollection = client.db('real-State-management').collection('user')
     const propertyCollection = client.db('real-State-management').collection('property')
     const reviewCollection = client.db('real-State-management').collection('review')
+    const wishlistCollection = client.db('real-State-management').collection('wishlist')
 
     app.get('/user/:email', async (req, res) => {
       const email = req.params.email
@@ -171,6 +172,28 @@ async function run() {
       const result = await reviewCollection.insertOne(reviewInfo)
       res.send(result)
 
+    })
+    app.post('/added-wishlist',async (req,res) => {
+      const info=req.body
+      
+      const query={email:info?.customerEmail}
+      const result=await userCollection.findOne(query)
+    
+      const query1={
+        propertyId:info?.propertyId
+      }
+      const result2=await wishlistCollection.findOne(query1)
+      
+      if(result.role==='Admin' || result.role==="Agent")
+      {  return res.send({message:`${result.role} can not add property in wishList and buy`})}
+      else if(result2){
+        return res.send({message:'Already added wishlit'})
+      }
+      else{
+        const result1= await wishlistCollection.insertOne(info)
+        res.send(result1)
+      }
+     
     })
     app.patch('/property-varification/:id', async (req, res) => {
       const id = req.params.id
