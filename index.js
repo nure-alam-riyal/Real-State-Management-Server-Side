@@ -53,7 +53,7 @@ async function run() {
       const query={email: email}
       const user=await userCollection.findOne(query)
       // console.log(user?.role)
-      
+
       const isAdmin=user?.role==='Admin'
       if(!isAdmin)
        { res.status(403).send({message:"Forbiden Access"})}
@@ -151,6 +151,8 @@ async function run() {
       const query = { _id: new ObjectId(id) }
       const result = await propertyCollection.findOne(query)
       res.send(result)
+
+      
 
     })
     app.get('/review/:id', async (req, res) => {
@@ -420,6 +422,12 @@ async function run() {
 
 
     })
+    app.delete('/reviewDelete/:id',async (req,res) => {
+       const id=req.params.id
+       const query={_id:new ObjectId(id)}
+       const result=await reviewCollection.deleteOne(query)
+       res.send(result)
+    }) 
 
 
 
