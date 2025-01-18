@@ -4,6 +4,7 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 1506
+const jwt = require('jsonwebtoken');
 
 
 // Middleware
@@ -31,14 +32,43 @@ async function run() {
     const reviewCollection = client.db('real-State-management').collection('review')
     const wishlistCollection = client.db('real-State-management').collection('wishlist')
     const offerCollection = client.db('real-State-management').collection('offer')
+     app.post('/jwt',async (req,res) => {
+     const info= req.body
+    const token= jwt.sign(info,process.env.Acces_Token,{expiresIn:'1h'})
+     res.send({token})
+     })
+     const varifyToken=(req,res,next)=>{
+              // console.log('riyal',req.headers.authorization)
+                const Acces_Token= req.headers.authorization.split(' ')[1]
+                jwt.verify(Acces_Token, process.env.Acces_Token, function(err, decoded) {
+                  if(err) {return res.status(401).send({ message: 'unauthorized access' })}
 
+                    req.decoded=decoded;
+                    next()
+                });
+                
+     }
+     const adminToken=async(req,res,next)=>{
+      const email=req.decoded?.email
+      const query={email: email}
+      const user=await userCollection.findOne(query)
+      // console.log(user?.role)
+      
+      const isAdmin=user?.role==='Admin'
+      if(!isAdmin)
+       { res.status(403).send({message:"Forbiden Access"})}
+      // console.log(isAdmin)
+
+      next()
+     }
+    
     app.get('/user/:email', async (req, res) => {
       const email = req.params.email
       const query = { email }
       const result = await userCollection.findOne(query)
       res.send(result)
     })
-    app.get('/alluser', async (req, res) => {
+    app.get('/alluser',varifyToken,adminToken, async (req, res) => {
 
       const query = {
         role: {
@@ -52,10 +82,17 @@ async function run() {
       const result = await propertyCollection.find().toArray()
       res.send(result)
     })
-    app.get('/allProperties', async (req, res) => {
+    app.get('/allProperties',varifyToken, async (req, res) => {
       const query = { varifyStatus: "verified" }
       const result = await propertyCollection.find(query).toArray()
       res.send(result)
+
+    })
+    app.get('/Properties', async (req, res) => {
+      const query = { varifyStatus: "verified" }
+      const result = await propertyCollection.find(query).toArray()
+      res.send(result)
+
     })
     app.get('/property/:email', async (req, res) => {
       const email = req.params?.email
