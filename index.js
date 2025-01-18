@@ -30,6 +30,7 @@ async function run() {
     const propertyCollection = client.db('real-State-management').collection('property')
     const reviewCollection = client.db('real-State-management').collection('review')
     const wishlistCollection = client.db('real-State-management').collection('wishlist')
+    const offerCollection = client.db('real-State-management').collection('offer')
 
     app.get('/user/:email', async (req, res) => {
       const email = req.params.email
@@ -56,11 +57,64 @@ async function run() {
       const result = await propertyCollection.find(query).toArray()
       res.send(result)
     })
-    app.get('/Property/:id', async (req, res) => {
+    app.get('/property/:email', async (req, res) => {
+      const email = req.params?.email
+      // console.log(email)
+      const filter = { agentEmail: email }
+      const result = await propertyCollection.find(filter).toArray()
+      res.send(result)
+
+    })
+
+    app.get('/offer/:email', async (req, res) => {
+      const email = req.params?.email
+
+      const result = await offerCollection.aggregate([
+        {
+
+          $match: { customerEmail: email }
+
+        },
+        {
+          $addFields: {
+            propertId: { $toObjectId: "$propertyId" }
+          }
+        },
+        {
+          $lookup: {
+            from: "property",
+            localField: 'propertId',
+            foreignField: '_id',
+            as: "offerProperty"
+          }
+        },
+        {
+          $unwind: "$offerProperty"
+
+        },
+        {
+          $addFields: {
+
+            image: '$offerProperty.image',
+
+          }
+        },
+        {
+          $project: {
+            offerProperty: 0
+          }
+        }
+
+      ]).toArray()
+      res.send(result)
+    })
+
+    app.get('/oneproperty/:id', async (req, res) => {
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
       const result = await propertyCollection.findOne(query)
       res.send(result)
+
     })
     app.get('/review/:id', async (req, res) => {
       const id = req.params.id
@@ -91,6 +145,7 @@ async function run() {
           }
         }, {
           $unwind: "$reviewProperty"
+
         }, {
           $addFields: {
             propertyName: '$reviewProperty.propertyName',
@@ -111,6 +166,10 @@ async function run() {
     })
     app.get('/allreview', async (req, res) => {
       const result = await reviewCollection.find().toArray()
+      res.send(result)
+    })
+    app.get('/offer', async (req, res) => {
+      const result = await offerCollection.find().toArray()
       res.send(result)
     })
     app.get('/latestreview', async (req, res) => {
@@ -134,9 +193,10 @@ async function run() {
           }
         }, {
           $unwind: "$reviewProperty"
+
         }, {
           $addFields: {
-            propertyName:'$reviewProperty.propertyName',
+            propertyName: '$reviewProperty.propertyName',
             // image:'$reviewProperty.image',
             // agentName: '$reviewProperty.agentName',
             // agentImage: '$reviewProperty.agentImage'
@@ -152,7 +212,67 @@ async function run() {
       ]).skip(count - 3).limit(count).toArray()
       res.send(result)
     })
+    app.get('/myWishlist/:email', async (req, res) => {
+      const email = req.params.email
+      // console.log(email)
+      const result = await wishlistCollection.aggregate([
+        {
+          $match: { customerEmail: email }
+        },
+        {
+          $addFields: { propertyId: { $toObjectId: "$propertyId" } }
+        },
+        {
+          $lookup: {
+            from: 'property',
+            localField: "propertyId",
+            foreignField: "_id",
+            as: "property"
+          }
+        },
+        {
+          $unwind: "$property"
+        },
+        {
+          $addFields: {
+            maxPrice: "$property.maxPrice",
+            minPrice: "$property.minPrice",
+            location: "$property.location",
+            propertyName: "$property.propertyName",
+            agentName: "$property.agentName",
+            varifyStatus: "$property.varifyStatus",
+            agentEmail: "$property.agentEmail"
 
+          },
+        },
+        {
+          $project: {
+            property: 0
+          }
+        }, {
+          $lookup: {
+            from: 'user',
+            localField: "agentEmail",
+            foreignField: "email",
+            as: "property"
+          }
+
+        },
+        {
+          $unwind: "$property"
+        }, {
+          $addFields: {
+            agentImage: "$property.image"
+          }
+        },
+        {
+          $project: {
+            property: 0
+          }
+        }
+      ]).toArray()
+      res.send(result)
+    })
     app.post('/user', async (req, res) => {
       const user = req.body
       const query = { email: user?.email }
@@ -173,27 +293,37 @@ async function run() {
       res.send(result)
 
     })
-    app.post('/added-wishlist',async (req,res) => {
-      const info=req.body
-      
-      const query={email:info?.customerEmail}
-      const result=await userCollection.findOne(query)
-    
-      const query1={
-        propertyId:info?.propertyId
+    app.post('/offer', async (req, res) => {
+      const reviewInfo = req.body
+      const result = await offerCollection.insertOne(reviewInfo)
+      res.send(result)
+
+    })
+    app.post('/added-wishlist', async (req, res) => {
+      const info = req.body
+
+      const query = { email: info?.customerEmail }
+      const result = await userCollection.findOne(query)
+
+      const query1 = {
+        $and: [
+          { propertyId: info?.propertyId },
+          {
+            customerEmail: info?.customerEmail
+          }
+        ]
       }
-      const result2=await wishlistCollection.findOne(query1)
-      
-      if(result.role==='Admin' || result.role==="Agent")
-      {  return res.send({message:`${result.role} can not add property in wishList and buy`})}
-      else if(result2){
-        return res.send({message:'Already added wishlit'})
+      const result2 = await wishlistCollection.findOne(query1)
+
+      if (result.role === 'Admin' || result.role === "Agent") { return res.send({ message: `${result.role} can not add property in wishList and buy` }) }
+      else if (result2) {
+        return res.send({ message: 'Already added wishlit' })
       }
-      else{
-        const result1= await wishlistCollection.insertOne(info)
+      else {
+        const result1 = await wishlistCollection.insertOne(info)
         res.send(result1)
       }
-     
+
     })
     app.patch('/property-varification/:id', async (req, res) => {
       const id = req.params.id
@@ -209,6 +339,51 @@ async function run() {
       res.send(result)
 
     })
+    app.patch('/offerStatusChange', async (req, res) => {
+ 
+      const { id, customerEmail,status } = req.body
+     
+      const query = {
+        $and:
+        
+         [
+           {propertyId: id},
+          {customerEmail:customerEmail}
+        ]
+        
+      }
+      const updateDoc = {
+        $set: {
+          buyingStatus:status
+        },
+      };
+      const query1= {
+
+       $and:
+        [
+           {propertyId: id},
+          {customerEmail:
+            {
+              $ne:customerEmail
+            }
+          }
+        ]
+        
+      }
+      const updateDoc1 = {
+        $set: {
+          buyingStatus:'rejected'
+        },
+      };
+      const options = { upsert: true };
+      const result = await offerCollection.updateMany(query, updateDoc)
+      const result1 = await offerCollection.updateMany(query1, updateDoc1)
+
+      res.send(result)
+
+
+    })
+
 
 
 
