@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+
 require('dotenv').config();
+const stripe=require('stripe')(process.env.PaymentSecreatKey)
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 1506
@@ -21,6 +23,7 @@ const client = new MongoClient(uri, {
     strict: true,
     deprecationErrors: true,
   }
+  
 });
 
 async function run() {
@@ -32,6 +35,7 @@ async function run() {
     const reviewCollection = client.db('real-State-management').collection('review')
     const wishlistCollection = client.db('real-State-management').collection('wishlist')
     const offerCollection = client.db('real-State-management').collection('offer')
+    const paymentCollection = client.db('real-State-management').collection('payment')
      app.post('/jwt',async (req,res) => {
      const info= req.body
     const token= jwt.sign(info,process.env.Acces_Token,{expiresIn:'1h'})
@@ -48,6 +52,19 @@ async function run() {
                 });
                 
      }
+     const AgentToken=async(req,res,next)=>{
+      const email=req.decoded?.email
+      const query={email: email}
+      const user=await userCollection.findOne(query)
+      // console.log(user?.role)
+
+      const isAgent=user?.role==='Agent'
+      if(!isAgent)
+       { res.status(403).send({message:"Forbiden Access"})}
+      // console.log(isAdmin)
+
+      next()
+     }
      const adminToken=async(req,res,next)=>{
       const email=req.decoded?.email
       const query={email: email}
@@ -60,12 +77,19 @@ async function run() {
       // console.log(isAdmin)
 
       next()
+
      }
     
     app.get('/user/:email', async (req, res) => {
       const email = req.params.email
       const query = { email }
       const result = await userCollection.findOne(query)
+      res.send(result)
+    })
+    app.get('/payment/:email', async (req, res) => {
+      const email = req.params.email
+      const query = {agentEmail: email }
+      const result = await paymentCollection.find(query).toArray()
       res.send(result)
     })
     app.get('/alluser',varifyToken,adminToken, async (req, res) => {
@@ -83,9 +107,23 @@ async function run() {
       res.send(result)
     })
     app.get('/allProperties',varifyToken, async (req, res) => {
+      const {search}=req.query
+      
       const query = { varifyStatus: "verified" }
-      const result = await propertyCollection.find(query).toArray()
-      res.send(result)
+      const query2={
+        $and:[
+          {
+            varifyStatus: "verified",
+            location:{ $regex: search, $options: "i" }
+          }
+        ]
+      }
+      if(search){
+        const result=await propertyCollection.find(query2).toArray()
+          res.send(result)
+      }
+    else { const result = await propertyCollection.find(query).toArray()
+      res.send(result)}
 
     })
     app.get('/Properties', async (req, res) => {
@@ -102,7 +140,12 @@ async function run() {
       res.send(result)
 
     })
-
+  app.get('/agentOffer/:email',async (req,res) => {
+    const email = req.params?.email
+    const query={agentEmail:email}
+    const result=await offerCollection.find(query).toArray()
+    res.send(result)
+  })
     app.get('/offer/:email', async (req, res) => {
       const email = req.params?.email
 
@@ -161,6 +204,14 @@ async function run() {
 
       const result = await reviewCollection.find(query).toArray()
       res.send(result)
+    })
+    app.get('/offer1/:id', async (req, res) => {
+      const id = req.params.id
+      const query = {_id:new ObjectId(id) }
+
+      const result = await offerCollection.findOne(query)
+      res.send(result)
+
     })
     app.get('/myreview/:email', async (req, res) => {
       const email = req.params.email
@@ -364,6 +415,15 @@ async function run() {
       }
 
     })
+    app.post('/payment-order',async (req,res) => {
+      const info=req.body
+      const {propertyId,offerId}=info
+      const queryForPropertyUpdate={_id:new ObjectId(propertyId)}
+      const queryForOfferUpdate={_id:new ObjectId(offerId)}
+      const propertyUpdate=await propertyCollection.updateOne()
+      const result =await paymentCollection.insertOne(info)
+      res.send(result)
+    })
     app.patch('/property-varification/:id', async (req, res) => {
       const id = req.params.id
       const status = req.body
@@ -375,6 +435,20 @@ async function run() {
       };
       const options = { upsert: true };
       const result = await propertyCollection.updateOne(query, updateDoc, options)
+      res.send(result)
+
+    })
+    app.patch('/userUpdate/:id',async (req,res) => {
+      const id = req.params?.id
+      const status = req.body
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          role:status?.role
+        },
+      };
+      const options = { upsert: true };
+      const result=await userCollection.updateOne(query,updateDoc,options)
       res.send(result)
 
     })
@@ -422,6 +496,12 @@ async function run() {
 
 
     })
+    app.delete('/user/:id',async (req,res) => {
+       const id=req.params.id
+       const query={_id:new ObjectId(id)}
+       const result=await userCollection.deleteOne(query)
+       res.send(result)
+    }) 
     app.delete('/propertyDelete/:id',async (req,res) => {
        const id=req.params.id
        const query={_id:new ObjectId(id)}
@@ -440,7 +520,28 @@ async function run() {
        const result=await wishlistCollection.deleteOne(query)
        res.send(result)
     }) 
+app.post('/create-Intent-server1',async (req,res) => {
+   const info=req?.body
+              console.log(info)
+    amount=parseFloat(info?.price*100)
+   const paymentIntent = await stripe.paymentIntents.create({
+  
 
+    currency: 'usd',
+   
+      amount:amount,
+      currency:'usd',
+      payment_method_types:[
+        "card"
+      ]
+    
+  });
+
+  res.send({
+    clientSecret:paymentIntent.client_secret
+  })
+
+})
 
 
 
@@ -453,7 +554,9 @@ async function run() {
     // Ensures that the client will close when you finish/error
     // await client.close();
   }
+
 }
+
 run().catch(console.dir);
 
 
