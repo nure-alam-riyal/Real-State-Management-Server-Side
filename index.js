@@ -424,6 +424,33 @@ async function run() {
       const result =await paymentCollection.insertOne(info)
       res.send(result)
     })
+    app.put('/propertyUpdate/:id',async (req,res) => {
+      const id=req.params.id
+      const query = { _id: new ObjectId(id) }
+      const info=req.body
+      const  updateDoc={
+        $set:{
+         
+varifyStatus:info?.varification,
+
+agentImage:info?.agentImage,
+
+image:info?.image,
+description:info?.description,
+agentName:info?.agentName,
+
+agentEmail:info?.agentEmail,
+location:info?.location,
+propertyName:info?.propertyName,
+
+maxPrice:info?.maxPrice,
+minPrice:info?.minPrice,
+
+        }
+      }
+      const result=await propertyCollection.updateOne(query,updateDoc)
+      res.send(result)
+    })
     app.patch('/property-varification/:id', async (req, res) => {
       const id = req.params.id
       const status = req.body
