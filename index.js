@@ -29,7 +29,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     const userCollection = client.db('real-State-management').collection('user')
     const propertyCollection = client.db('real-State-management').collection('property')
     const reviewCollection = client.db('real-State-management').collection('review')
@@ -42,7 +42,7 @@ async function run() {
      res.send({token})
      })
      const varifyToken=(req,res,next)=>{
-              // console.log('riyal',req.headers.authorization)
+              // //console.log('riyal',req.headers.authorization)
                 const Acces_Token= req.headers.authorization.split(' ')[1]
                 jwt.verify(Acces_Token, process.env.Acces_Token, function(err, decoded) {
                   if(err) {return res.status(401).send({ message: 'unauthorized access' })}
@@ -56,12 +56,12 @@ async function run() {
       const email=req.decoded?.email
       const query={email: email}
       const user=await userCollection.findOne(query)
-      // console.log(user?.role)
+      // //console.log(user?.role)
 
       const isAgent=user?.role==='Agent'
       if(!isAgent)
        { res.status(403).send({message:"Forbiden Access"})}
-      // console.log(isAdmin)
+      // //console.log(isAdmin)
 
       next()
      }
@@ -69,18 +69,18 @@ async function run() {
       const email=req.decoded?.email
       const query={email: email}
       const user=await userCollection.findOne(query)
-      // console.log(user?.role)
+      // //console.log(user?.role)
 
       const isAdmin=user?.role==='Admin'
       if(!isAdmin)
        { res.status(403).send({message:"Forbiden Access"})}
-      // console.log(isAdmin)
+      // //console.log(isAdmin)
 
       next()
 
      }
     
-    app.get('/user/:email', async (req, res) => {
+    app.get('/user/:email',varifyToken, async (req, res) => {
       const email = req.params.email
       const query = { email }
       const result = await userCollection.findOne(query)
@@ -106,9 +106,9 @@ async function run() {
       const result = await propertyCollection.find().toArray()
       res.send(result)
     })
-    app.get('/allProperties',varifyToken, async (req, res) => {
-      const {search}=req.query
-      
+    app.get('/allProperties', async (req, res) => {
+      const {search,max,min,range}=req.query
+      //console.log(search,max,min,range)
       const query = { varifyStatus: "verified" }
       const query2={
         $and:[
@@ -122,8 +122,47 @@ async function run() {
         const result=await propertyCollection.find(query2).toArray()
           res.send(result)
       }
-    else { const result = await propertyCollection.find(query).toArray()
-      res.send(result)}
+     else if(range==='range'){
+        const result=await propertyCollection.find(query).sort({maxPrice:-1,minPrice:1}).toArray()
+          res.send(result)
+      }
+    else  if(max==='max'){
+        const result=await propertyCollection.find(query).sort({maxPrice:-1}).toArray()
+          res.send(result)
+      }
+     else if(min==='min'){
+        const result=await propertyCollection.find(query).sort({minPrice:1}).toArray()
+          res.send(result)
+      }
+      else{
+        const result = await propertyCollection.find(query).toArray()
+        res.send(result)
+      }
+    
+    
+
+    })
+    app.get('/advertise', async (req, res) => {
+      // const {search}=req.query
+      
+      // const query = { varifyStatus: "verified" }
+      const query2={
+        $and:[
+          {
+            varifyStatus: "verified",
+           activity:"advertise"
+          }
+        ]
+      }
+
+      // if(search){
+      //   const result=await propertyCollection.find(query2).toArray()
+      //     res.send(result)
+      // }
+    
+       const result = await propertyCollection.find(query2).sort({count:-1}).toArray()
+      res.send(result)
+    
 
     })
     app.get('/Properties', async (req, res) => {
@@ -134,7 +173,7 @@ async function run() {
     })
     app.get('/property/:email', async (req, res) => {
       const email = req.params?.email
-      // console.log(email)
+      // //console.log(email)
       const filter = { agentEmail: email }
       const result = await propertyCollection.find(filter).toArray()
       res.send(result)
@@ -264,7 +303,7 @@ async function run() {
     })
     app.get('/latestreview', async (req, res) => {
       const count = await reviewCollection.estimatedDocumentCount()
-
+        let skip=count-4
       const result = await reviewCollection.aggregate([
         {
           $match: {}
@@ -299,12 +338,13 @@ async function run() {
         }
 
 
-      ]).skip(count - 3).limit(count).toArray()
+
+      ]).skip(skip).limit(count).toArray()
       res.send(result)
     })
     app.get('/myWishlist/:email', async (req, res) => {
       const email = req.params.email
-      // console.log(email)
+      // //console.log(email)
       const result = await wishlistCollection.aggregate([
         {
           $match: { customerEmail: email }
@@ -419,8 +459,20 @@ async function run() {
       const info=req.body
       const {propertyId,offerId}=info
       const queryForPropertyUpdate={_id:new ObjectId(propertyId)}
+      const updateDoc1={
+        $set:{
+         varifyStatus:'sold',
+        }
+      }
+      const updateDoc2={
+        $set:{
+         
+           buyingStatus:'sold',
+        }
+      }
       const queryForOfferUpdate={_id:new ObjectId(offerId)}
-      const propertyUpdate=await propertyCollection.updateOne()
+      const propertyUpdate=await propertyCollection.updateOne(queryForPropertyUpdate,updateDoc1)
+      const offerUpdate=await offerCollection.updateOne(queryForOfferUpdate,updateDoc2)
       const result =await paymentCollection.insertOne(info)
       res.send(result)
     })
@@ -431,7 +483,7 @@ async function run() {
       const  updateDoc={
         $set:{
          
-varifyStatus:info?.varification,
+varifyStatus:info?.varifyStatus,
 
 agentImage:info?.agentImage,
 
@@ -469,6 +521,13 @@ minPrice:info?.minPrice,
       const id = req.params?.id
       const status = req.body
       const query = { _id: new ObjectId(id) }
+      if(status?.role==="Fraud"){
+        const result1= await userCollection.findOne(query)
+        const query2={
+          agentEmail:result1?.email
+        }
+        const result2=await propertyCollection.deleteMany(query2)
+      }
       const updateDoc = {
         $set: {
           role:status?.role
@@ -477,6 +536,25 @@ minPrice:info?.minPrice,
       const options = { upsert: true };
       const result=await userCollection.updateOne(query,updateDoc,options)
       res.send(result)
+
+    })
+    app.put('/allProperty1/:id',async (req,res) => {
+      const id = req.params?.id
+
+      const status = req.body
+      const query = { _id: new ObjectId(id) }
+     
+      //console.log(status)
+      const updateDoc = {
+        $set: {
+
+          activity:status?.activity,
+          count:(parseInt(status?.count))+1,
+        }
+      };
+      const options = { upsert: true };
+      const result=await propertyCollection.updateOne(query,updateDoc,options)
+     res.send(result)
 
     })
     app.patch('/offerStatusChange', async (req, res) => {
@@ -549,18 +627,21 @@ minPrice:info?.minPrice,
     }) 
 app.post('/create-Intent-server1',async (req,res) => {
    const info=req?.body
-              console.log(info)
+              //console.log(info)
     amount=parseFloat(info?.price*100)
+    console.log(info)
    const paymentIntent = await stripe.paymentIntents.create({
   
 
     currency: 'usd',
    
       amount:amount,
-      currency:'usd',
+   
       payment_method_types:[
         "card"
       ]
+
+
     
   });
 
@@ -574,9 +655,10 @@ app.post('/create-Intent-server1',async (req,res) => {
 
 
 
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    //console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -592,5 +674,5 @@ app.get('/', (req, res) => {
 })
 
 app.listen(port, () => {
-  console.log(`server in running on the Port is ${port}`)
+  //console.log(`server in running on the Port is ${port}`)
 })
