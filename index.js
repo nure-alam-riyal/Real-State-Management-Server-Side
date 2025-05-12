@@ -2,16 +2,17 @@ const express = require('express');
 const cors = require('cors');
 
 require('dotenv').config();
-const stripe=require('stripe')(process.env.PaymentSecreatKey)
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.PaymentSecreatKey)
+const { MongoClient, ServerApiVersion, ObjectId, Admin } = require('mongodb');
 const app = express()
-const port = process.env.PORT || 1506
+const port = process.env.PORT || 1515
 const jwt = require('jsonwebtoken');
 
 
 // Middleware
 app.use(express.json())
 app.use(cors())
+
 
 
 const uri = `mongodb+srv://${process.env.NAME}:${process.env.PASS}@nurealamriyal.adrs4.mongodb.net/?retryWrites=true&w=majority&appName=nurealamriyal`;
@@ -23,7 +24,7 @@ const client = new MongoClient(uri, {
     strict: true,
     deprecationErrors: true,
   }
-  
+
 });
 
 async function run() {
@@ -36,51 +37,50 @@ async function run() {
     const wishlistCollection = client.db('real-State-management').collection('wishlist')
     const offerCollection = client.db('real-State-management').collection('offer')
     const paymentCollection = client.db('real-State-management').collection('payment')
-     app.post('/jwt',async (req,res) => {
-     const info= req.body
-    const token= jwt.sign(info,process.env.Acces_Token,{expiresIn:'1h'})
-     res.send({token})
-     })
-     const varifyToken=(req,res,next)=>{
-              // //console.log('riyal',req.headers.authorization)
-                const Acces_Token= req.headers.authorization.split(' ')[1]
-                jwt.verify(Acces_Token, process.env.Acces_Token, function(err, decoded) {
-                  if(err) {return res.status(401).send({ message: 'unauthorized access' })}
+    app.post('/jwt', async (req, res) => {
+      const info = req.body
+      const token = jwt.sign(info, process.env.Acces_Token, { expiresIn: '5h' })
+      res.send({ token })
+    })
+    const varifyToken = (req, res, next) => {
+      // console.log('riyal',req.headers.authorization)
 
-                    req.decoded=decoded;
-                    next()
-                });
-                
-     }
-     const AgentToken=async(req,res,next)=>{
-      const email=req.decoded?.email
-      const query={email: email}
-      const user=await userCollection.findOne(query)
+      const Acces_Token = req.headers.authorization.split(' ')[1]
+      jwt.verify(Acces_Token, process.env.Acces_Token, function (err, decoded) {
+        if (err) { return res.status(401).send({ message: 'unauthorized access' }) }
+
+        req.decoded = decoded;
+        next()
+      });
+
+    }
+    const AgentToken = async (req, res, next) => {
+      const email = req.decoded?.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
       // //console.log(user?.role)
 
-      const isAgent=user?.role==='Agent'
-      if(!isAgent)
-       { res.status(403).send({message:"Forbiden Access"})}
+      const isAgent = user?.role === 'Agent'
+      if (!isAgent) { res.status(403).send({ message: "Forbiden Access" }) }
       // //console.log(isAdmin)
 
       next()
-     }
-     const adminToken=async(req,res,next)=>{
-      const email=req.decoded?.email
-      const query={email: email}
-      const user=await userCollection.findOne(query)
+    }
+    const adminToken = async (req, res, next) => {
+      const email = req.decoded?.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
       // //console.log(user?.role)
 
-      const isAdmin=user?.role==='Admin'
-      if(!isAdmin)
-       { res.status(403).send({message:"Forbiden Access"})}
+      const isAdmin = user?.role === 'Admin'
+      if (!isAdmin) { res.status(403).send({ message: "Forbiden Access" }) }
       // //console.log(isAdmin)
 
       next()
 
-     }
-    
-    app.get('/user/:email',varifyToken, async (req, res) => {
+    }
+
+    app.get('/user/:email', async (req, res) => {
       const email = req.params.email
       const query = { email }
       const result = await userCollection.findOne(query)
@@ -88,11 +88,11 @@ async function run() {
     })
     app.get('/payment/:email', async (req, res) => {
       const email = req.params.email
-      const query = {agentEmail: email }
+      const query = { agentEmail: email }
       const result = await paymentCollection.find(query).toArray()
       res.send(result)
     })
-    app.get('/alluser',varifyToken,adminToken, async (req, res) => {
+    app.get('/alluser', varifyToken, adminToken, async (req, res) => {
 
       const query = {
         role: {
@@ -107,50 +107,50 @@ async function run() {
       res.send(result)
     })
     app.get('/allProperties', async (req, res) => {
-      const {search,max,min,range}=req.query
+      const { search, max, min, range } = req.query
       //console.log(search,max,min,range)
       const query = { varifyStatus: "verified" }
-      const query2={
-        $and:[
+      const query2 = {
+        $and: [
           {
             varifyStatus: "verified",
-            location:{ $regex: search, $options: "i" }
+            location: { $regex: search, $options: "i" }
           }
         ]
       }
-      if(search){
-        const result=await propertyCollection.find(query2).toArray()
-          res.send(result)
+      if (search) {
+        const result = await propertyCollection.find(query2).toArray()
+        res.send(result)
       }
-     else if(range==='range'){
-        const result=await propertyCollection.find(query).sort({maxPrice:-1,minPrice:1}).toArray()
-          res.send(result)
+      else if (range === 'range') {
+        const result = await propertyCollection.find(query).sort({ maxPrice: -1, minPrice: 1 }).toArray()
+        res.send(result)
       }
-    else  if(max==='max'){
-        const result=await propertyCollection.find(query).sort({maxPrice:-1}).toArray()
-          res.send(result)
+      else if (max === 'max') {
+        const result = await propertyCollection.find(query).sort({ maxPrice: -1 }).toArray()
+        res.send(result)
       }
-     else if(min==='min'){
-        const result=await propertyCollection.find(query).sort({minPrice:1}).toArray()
-          res.send(result)
+      else if (min === 'min') {
+        const result = await propertyCollection.find(query).sort({ minPrice: 1 }).toArray()
+        res.send(result)
       }
-      else{
+      else {
         const result = await propertyCollection.find(query).toArray()
         res.send(result)
       }
-    
-    
+
+
 
     })
     app.get('/advertise', async (req, res) => {
       // const {search}=req.query
-      
+
       // const query = { varifyStatus: "verified" }
-      const query2={
-        $and:[
+      const query2 = {
+        $and: [
           {
             varifyStatus: "verified",
-           activity:"advertise"
+            activity: "advertise"
           }
         ]
       }
@@ -159,10 +159,10 @@ async function run() {
       //   const result=await propertyCollection.find(query2).toArray()
       //     res.send(result)
       // }
-    
-       const result = await propertyCollection.find(query2).sort({count:-1}).toArray()
+
+      const result = await propertyCollection.find(query2).sort({ count: -1 }).toArray()
       res.send(result)
-    
+
 
     })
     app.get('/Properties', async (req, res) => {
@@ -179,12 +179,12 @@ async function run() {
       res.send(result)
 
     })
-  app.get('/agentOffer/:email',async (req,res) => {
-    const email = req.params?.email
-    const query={agentEmail:email}
-    const result=await offerCollection.find(query).toArray()
-    res.send(result)
-  })
+    app.get('/agentOffer/:email', async (req, res) => {
+      const email = req.params?.email
+      const query = { agentEmail: email }
+      const result = await offerCollection.find(query).toArray()
+      res.send(result)
+    })
     app.get('/offer/:email', async (req, res) => {
       const email = req.params?.email
 
@@ -234,7 +234,7 @@ async function run() {
       const result = await propertyCollection.findOne(query)
       res.send(result)
 
-      
+
 
     })
     app.get('/review/:id', async (req, res) => {
@@ -246,7 +246,7 @@ async function run() {
     })
     app.get('/offer1/:id', async (req, res) => {
       const id = req.params.id
-      const query = {_id:new ObjectId(id) }
+      const query = { _id: new ObjectId(id) }
 
       const result = await offerCollection.findOne(query)
       res.send(result)
@@ -303,7 +303,8 @@ async function run() {
     })
     app.get('/latestreview', async (req, res) => {
       const count = await reviewCollection.estimatedDocumentCount()
-        let skip=count-4
+      let skip = count - 4
+
       const result = await reviewCollection.aggregate([
         {
           $match: {}
@@ -320,10 +321,12 @@ async function run() {
             foreignField: '_id',
             as: "reviewProperty"
           }
-        }, {
+        },
+        {
           $unwind: "$reviewProperty"
 
-        }, {
+        },
+        {
           $addFields: {
             propertyName: '$reviewProperty.propertyName',
             // image:'$reviewProperty.image',
@@ -331,16 +334,102 @@ async function run() {
             // agentImage: '$reviewProperty.agentImage'
           }
         },
-        {
-          $project: {
-            reviewProperty: 0
-          }
-        }
+        // {
+        //   $project: {
+        //     reviewProperty: 0
+        //   }
+        // }
 
 
 
       ]).skip(skip).limit(count).toArray()
+      console.log(result)
       res.send(result)
+
+    })
+    app.get('/customerOverWall/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = {
+        reviewerEmail: email
+      }
+      const query3 = {
+
+        buyerEmail: email
+      }
+      const query2 = {
+
+        customerEmail: email
+      }
+      const query1 = {
+
+        buyerEmail: email
+      }
+      const reviewNum = await reviewCollection.countDocuments(query)
+      const wishListNum = await wishlistCollection.countDocuments(query2)
+      const offerNum = await offerCollection.countDocuments(query2)
+      const paymentNum = await paymentCollection.countDocuments(query3)
+
+      const clientAllData = [
+        reviewNum, wishListNum, offerNum, paymentNum
+      ]
+
+
+      res.send(clientAllData)
+
+    })
+    app.get('/AgentOverWall/:email', async (req, res) => {
+      const email = req.params.email;
+
+      const query3 = {
+
+        agentEmail: email
+      }
+      const query2 = {
+
+
+        agentEmail: email
+      }
+      const query1 = {
+
+        agentEmail: email
+      }
+      const query = { agentEmail: email }
+      const result = await paymentCollection.find(query).toArray()
+      const addedPropertyNum = await propertyCollection.countDocuments(query1)
+      const requestNum = await offerCollection.countDocuments(query2)
+      const soldNum = await paymentCollection.countDocuments(query3)
+      const revenue = await paymentCollection.find(query).toArray()
+      let sum = 0
+      const taka = revenue.map(revenue => {
+        sum = sum + revenue?.totalPrice
+        return sum
+      })
+      const clientAllData = [
+        addedPropertyNum, requestNum, soldNum, taka[taka?.length - 1]
+      ]
+
+
+      res.send(clientAllData)
+
+    })
+    app.get('/AdminOverWall', async (req, res) => {
+
+      const admin = await userCollection.countDocuments({ role: "Admin" })
+      const agent = await userCollection.countDocuments({ role: "Agent" })
+      const fraud = await userCollection.countDocuments({ role: "Fraud" })
+      const Customer = await userCollection.countDocuments({ role: "Customer" })
+
+      // const addedPropertyNum=await propertyCollection.countDocuments(query1)
+      // const requestNum=await offerCollection.countDocuments(query2)
+      // const soldNum=await paymentCollection.countDocuments(query3)
+
+      const AdminAllData = {
+        "user": [admin, agent, fraud, Customer],
+      }
+
+
+      res.send(AdminAllData)
+
     })
     app.get('/myWishlist/:email', async (req, res) => {
       const email = req.params.email
@@ -455,52 +544,52 @@ async function run() {
       }
 
     })
-    app.post('/payment-order',async (req,res) => {
-      const info=req.body
-      const {propertyId,offerId}=info
-      const queryForPropertyUpdate={_id:new ObjectId(propertyId)}
-      const updateDoc1={
-        $set:{
-         varifyStatus:'sold',
+    app.post('/payment-order', async (req, res) => {
+      const info = req.body
+      const { propertyId, offerId } = info
+      const queryForPropertyUpdate = { _id: new ObjectId(propertyId) }
+      const updateDoc1 = {
+        $set: {
+          varifyStatus: 'sold',
         }
       }
-      const updateDoc2={
-        $set:{
-         
-           buyingStatus:'sold',
+      const updateDoc2 = {
+        $set: {
+
+          buyingStatus: 'sold',
         }
       }
-      const queryForOfferUpdate={_id:new ObjectId(offerId)}
-      const propertyUpdate=await propertyCollection.updateOne(queryForPropertyUpdate,updateDoc1)
-      const offerUpdate=await offerCollection.updateOne(queryForOfferUpdate,updateDoc2)
-      const result =await paymentCollection.insertOne(info)
+      const queryForOfferUpdate = { _id: new ObjectId(offerId) }
+      const propertyUpdate = await propertyCollection.updateOne(queryForPropertyUpdate, updateDoc1)
+      const offerUpdate = await offerCollection.updateOne(queryForOfferUpdate, updateDoc2)
+      const result = await paymentCollection.insertOne(info)
       res.send(result)
     })
-    app.put('/propertyUpdate/:id',async (req,res) => {
-      const id=req.params.id
+    app.put('/propertyUpdate/:id', async (req, res) => {
+      const id = req.params.id
       const query = { _id: new ObjectId(id) }
-      const info=req.body
-      const  updateDoc={
-        $set:{
-         
-varifyStatus:info?.varifyStatus,
+      const info = req.body
+      const updateDoc = {
+        $set: {
 
-agentImage:info?.agentImage,
+          varifyStatus: info?.varifyStatus,
 
-image:info?.image,
-description:info?.description,
-agentName:info?.agentName,
+          agentImage: info?.agentImage,
 
-agentEmail:info?.agentEmail,
-location:info?.location,
-propertyName:info?.propertyName,
+          image: info?.image,
+          description: info?.description,
+          agentName: info?.agentName,
 
-maxPrice:info?.maxPrice,
-minPrice:info?.minPrice,
+          agentEmail: info?.agentEmail,
+          location: info?.location,
+          propertyName: info?.propertyName,
+
+          maxPrice: info?.maxPrice,
+          minPrice: info?.minPrice,
 
         }
       }
-      const result=await propertyCollection.updateOne(query,updateDoc)
+      const result = await propertyCollection.updateOne(query, updateDoc)
       res.send(result)
     })
     app.patch('/property-varification/:id', async (req, res) => {
@@ -517,80 +606,81 @@ minPrice:info?.minPrice,
       res.send(result)
 
     })
-    app.patch('/userUpdate/:id',async (req,res) => {
+    app.patch('/userUpdate/:id', async (req, res) => {
       const id = req.params?.id
       const status = req.body
       const query = { _id: new ObjectId(id) }
-      if(status?.role==="Fraud"){
-        const result1= await userCollection.findOne(query)
-        const query2={
-          agentEmail:result1?.email
+      if (status?.role === "Fraud") {
+        const result1 = await userCollection.findOne(query)
+        const query2 = {
+          agentEmail: result1?.email
         }
-        const result2=await propertyCollection.deleteMany(query2)
+        const result2 = await propertyCollection.deleteMany(query2)
       }
       const updateDoc = {
         $set: {
-          role:status?.role
+          role: status?.role
         },
       };
       const options = { upsert: true };
-      const result=await userCollection.updateOne(query,updateDoc,options)
+      const result = await userCollection.updateOne(query, updateDoc, options)
       res.send(result)
 
     })
-    app.put('/allProperty1/:id',async (req,res) => {
+    app.put('/allProperty1/:id', async (req, res) => {
       const id = req.params?.id
 
       const status = req.body
       const query = { _id: new ObjectId(id) }
-     
+
       //console.log(status)
       const updateDoc = {
         $set: {
 
-          activity:status?.activity,
-          count:(parseInt(status?.count))+1,
+          activity: status?.activity,
+          count: (parseInt(status?.count)) + 1,
         }
       };
       const options = { upsert: true };
-      const result=await propertyCollection.updateOne(query,updateDoc,options)
-     res.send(result)
+      const result = await propertyCollection.updateOne(query, updateDoc, options)
+      res.send(result)
 
     })
     app.patch('/offerStatusChange', async (req, res) => {
- 
-      const { id, customerEmail,status } = req.body
-     
+
+      const { id, customerEmail, status } = req.body
+
       const query = {
         $and:
-        
-         [
-           {propertyId: id},
-          {customerEmail:customerEmail}
-        ]
-        
+
+          [
+            { propertyId: id },
+            { customerEmail: customerEmail }
+          ]
+
       }
       const updateDoc = {
         $set: {
-          buyingStatus:status
+          buyingStatus: status
         },
       };
-      const query1= {
+      const query1 = {
 
-       $and:
-        [
-           {propertyId: id},
-          {customerEmail:
+        $and:
+          [
+            { propertyId: id },
             {
-              $ne:customerEmail
+              customerEmail:
+              {
+                $ne: customerEmail
+              }
             }
-          }
-        ]
-        
+          ]
+
       }
       const updateDoc1 = {
         $set: {
-          buyingStatus:'rejected'
+          buyingStatus: 'rejected'
         },
       };
       const options = { upsert: true };
@@ -601,55 +691,56 @@ minPrice:info?.minPrice,
 
 
     })
-    app.delete('/user/:id',async (req,res) => {
-       const id=req.params.id
-       const query={_id:new ObjectId(id)}
-       const result=await userCollection.deleteOne(query)
-       res.send(result)
-    }) 
-    app.delete('/propertyDelete/:id',async (req,res) => {
-       const id=req.params.id
-       const query={_id:new ObjectId(id)}
-       const result=await propertyCollection.deleteOne(query)
-       res.send(result)
-    }) 
-    app.delete('/reviewDelete/:id',async (req,res) => {
-       const id=req.params.id
-       const query={_id:new ObjectId(id)}
-       const result=await reviewCollection.deleteOne(query)
-       res.send(result)
-    }) 
-    app.delete('/wishlistDelete/:id',async (req,res) => {
-       const id=req.params.id
-       const query={_id:new ObjectId(id)}
-       const result=await wishlistCollection.deleteOne(query)
-       res.send(result)
-    }) 
-app.post('/create-Intent-server1',async (req,res) => {
-   const info=req?.body
-              //console.log(info)
-    amount=parseFloat(info?.price*100)
-    console.log(info)
-   const paymentIntent = await stripe.paymentIntents.create({
-  
-
-    currency: 'usd',
-   
-      amount:amount,
-   
-      payment_method_types:[
-        "card"
-      ]
+    app.delete('/user/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await userCollection.deleteOne(query)
+      res.send(result)
+    })
+    app.delete('/propertyDelete/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await propertyCollection.deleteOne(query)
+      res.send(result)
+    })
+    app.delete('/reviewDelete/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await reviewCollection.deleteOne(query)
+      res.send(result)
+    })
+    app.delete('/wishlistDelete/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await wishlistCollection.deleteOne(query)
+      res.send(result)
+    })
+    app.post('/create-Intent-server1', async (req, res) => {
+      const info = req?.body
+      //console.log(info)
+      amount = parseFloat(info?.price * 100)
+      console.log(info)
+      const paymentIntent = await stripe.paymentIntents.create({
 
 
-    
-  });
+        currency: 'usd',
 
-  res.send({
-    clientSecret:paymentIntent.client_secret
-  })
+        amount: amount,
 
-})
+        payment_method_types: [
+          "card"
+        ]
+
+
+
+
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+
+    })
 
 
 
@@ -673,6 +764,8 @@ app.get('/', (req, res) => {
   res.send('Serrver in running')
 })
 
+
+
 app.listen(port, () => {
-  //console.log(`server in running on the Port is ${port}`)
+  console.log(`server in running on the Port is ${port}`)
 })
