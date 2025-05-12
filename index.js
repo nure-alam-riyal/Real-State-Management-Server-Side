@@ -347,6 +347,25 @@ async function run() {
       res.send(result)
 
     })
+    app.get("/adminOverAll",async (req,res) => {
+    const  reviewNum = await reviewCollection.countDocuments()
+    const  wishListNum = await wishlistCollection.countDocuments()
+       const paymentNum = await paymentCollection.countDocuments()
+       const PropertyNum = await propertyCollection.countDocuments()
+       const PaymentData= await paymentCollection.find().toArray()
+       let sum=0;
+       for(n of PaymentData){
+           sum+=n?.totalPrice
+       }
+       const info={
+        reviewNum,
+        wishListNum,paymentNum,PropertyNum,sum
+       }
+       console.log(PaymentData)
+       res.send(info)
+      
+
+    })
     app.get('/customerOverWall/:email', async (req, res) => {
       const email = req.params.email;
       const query = {
