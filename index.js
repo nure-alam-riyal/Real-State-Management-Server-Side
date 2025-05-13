@@ -165,6 +165,7 @@ async function run() {
       res.send(result)
 
 
+      
     })
     app.get('/Properties', async (req, res) => {
       const query = { varifyStatus: "verified" }
