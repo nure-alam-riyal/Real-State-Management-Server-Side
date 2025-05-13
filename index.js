@@ -107,8 +107,9 @@ async function run() {
       res.send(result)
     })
     app.get('/allProperties', async (req, res) => {
-      const { search, max, min, range } = req.query
+      const { search, max, min, range,skip,limit } = req.query
       //console.log(search,max,min,range)
+    
       const query = { varifyStatus: "verified" }
       const query2 = {
         $and: [
@@ -119,23 +120,23 @@ async function run() {
         ]
       }
       if (search) {
-        const result = await propertyCollection.find(query2).toArray()
+        const result = await propertyCollection.find(query2).skip(parseInt(skip)).limit(parseInt(limit)).toArray()
         res.send(result)
       }
       else if (range === 'range') {
-        const result = await propertyCollection.find(query).sort({ maxPrice: -1, minPrice: 1 }).toArray()
+        const result = await propertyCollection.find(query).sort({ maxPrice: -1, minPrice: 1 }).skip(parseInt(skip)).limit(parseInt(limit)).toArray()
         res.send(result)
       }
       else if (max === 'max') {
-        const result = await propertyCollection.find(query).sort({ maxPrice: -1 }).toArray()
+        const result = await propertyCollection.find(query).sort({ maxPrice: -1 }).skip(parseInt(skip)).limit(parseInt(limit)).toArray()
         res.send(result)
       }
       else if (min === 'min') {
-        const result = await propertyCollection.find(query).sort({ minPrice: 1 }).toArray()
+        const result = await propertyCollection.find(query).sort({ minPrice: 1 }).skip(parseInt(skip)).limit(parseInt(limit)).toArray()
         res.send(result)
       }
       else {
-        const result = await propertyCollection.find(query).toArray()
+        const result = await propertyCollection.find(query).skip(parseInt(skip)).limit(parseInt(limit)).toArray()
         res.send(result)
       }
 
